@@ -1,238 +1,127 @@
-#Header Files
-import cv2
-import numpy as np
-from random import randint
+import streamlit as st
+import random
 
-#-----------------------------------------------------------------------------------
+# ---------- Initialize session state ----------
+if "menu" not in st.session_state:
+    st.session_state.menu = "main"   # main=menu, name=name input, game=playing
+if "board" not in st.session_state:
+    st.session_state.board = [""] * 9
+if "turn" not in st.session_state:
+    st.session_state.turn = "X"
+if "winner" not in st.session_state:
+    st.session_state.winner = None
+if "play_with_ai" not in st.session_state:
+    st.session_state.play_with_ai = False
+if "player1" not in st.session_state:
+    st.session_state.player1 = "Player 1"
+if "player2" not in st.session_state:
+    st.session_state.player2 = "Player 2"
 
-#Classes
-class Block() :
-    def __init__(self,i,j) :
-        self.value  = None
-        self.pos    = (i,j)
-    def setValue(self,value) :
-        self.value  = value
 
-#-----------------------------------------------------------------------------------
+# ---------- Reset game ----------
+def reset():
+    st.session_state.board = [""] * 9
+    st.session_state.turn = "X"
+    st.session_state.winner = None
 
-class GUI() :
-    def __init__(self,windowName) :
-        self.windowName = windowName
-        self.width,self.height = 400,400
-        self.menuHeight = 100
-        self.image  = np.zeros((self.height+self.menuHeight,self.width,3),np.uint8)
-        self.turn   = 1
-        self.vsCom  = 0
-        self.reset()
 
-    #-----------------------------------------------------------------------------------
-    #Reset Game
-    def reset(self) :
-        self.blocks = []
-        self.win    = False
-        self.change     = True
-        self.selected   = False
-        for i in range(3) :
-            row  = []
-            for j in range(3) :
-                row.append([Block(i,j),(j*(self.width//3)+3,i*(self.height//3)+3),((j+1)*(self.width//3)-3,(i+1)*(self.height//3)-3)])
-            self.blocks.append(row)
+# ---------- Check winner ----------
+def check_winner(board):
+    wins = [(0,1,2),(3,4,5),(6,7,8),
+            (0,3,6),(1,4,7),(2,5,8),
+            (0,4,8),(2,4,6)]
+    for a,b,c in wins:
+        if board[a] and board[a] == board[b] == board[c]:
+            return board[a]
+    if "" not in board:
+        return "Draw"
+    return None
 
-    #-----------------------------------------------------------------------------------
-    #Drawing GUI and Game Screen
-    def draw(self) :
-        self.image = np.zeros((self.height+self.menuHeight,self.width,3),np.uint8)
-        for i in range(3) :
-            for j in range(3) :
-                start_point = self.blocks[i][j][1]
-                end_point = self.blocks[i][j][2]
-                cv2.rectangle(self.image,start_point,end_point,(255,255,255),-1)
-                value = " " if self.blocks[i][j][0].value is None else self.blocks[i][j][0].value
-                cv2.putText(self.image,value,(j*(self.width//3)+25,(i*self.height//3)+100),cv2.FONT_HERSHEY_SIMPLEX,5,(0,0,0),5)
-        if self.checkWin() :
-            string = ("Player "+str(self.turn)+" Wins" if self.turn!=self.vsCom else "Computer Wins") if self.turn==1 else ("Player "+str(2)+" Wins" if self.turn!=self.vsCom else "Computer Wins")
-        else :
-            if not self.checkDraw() :
-                string = ("Player "+str(self.turn)+"'s Turn" if self.turn!=self.vsCom else "Computer's Turn") if self.turn==1 else ("Player "+str(2)+"'s Turn" if self.turn!=self.vsCom else "Computer's Turn")
-            else :
-                string = "Match Draw!!"
-        cv2.putText(self.image,string,(self.width//2-70,self.height+30),cv2.FONT_HERSHEY_SIMPLEX,0.5,(255,255,255),1)
-        cv2.putText(self.image,"R - Reset",(10,self.height+60),cv2.FONT_HERSHEY_SIMPLEX,0.5,(255,255,255),1)
-        cv2.putText(self.image,"Esc - Exit",(10,self.height+80),cv2.FONT_HERSHEY_SIMPLEX,0.5,(255,255,255),1)
-        string = "vs Computer" if self.vsCom==0 else "vs Human"
-        cv2.putText(self.image,"Space - "+string,(self.width//2+10,self.height+80),cv2.FONT_HERSHEY_SIMPLEX,0.5,(255,255,255),1)
 
-        if self.selected and not(self.checkWin() or self.checkDraw()):
-            self.change   = True
-            self.selected = False
-            self.turn *= -1
+# ---------- AI move ----------
+def ai_move():
+    empty = [i for i in range(9) if st.session_state.board[i] == ""]
+    if empty:
+        move = random.choice(empty)
+        st.session_state.board[move] = "O"
 
-    #-----------------------------------------------------------------------------------
-    #Game Menu Screen
-    def drawMenu(self):
-        self.image = np.zeros((self.height+self.menuHeight,self.width,3),np.uint8)
-        cv2.putText(self.image,"Tic Tac Toe",(20,80),cv2.FONT_HERSHEY_SIMPLEX,2,(255,255,255),3)
 
-        # Buttons
-        cv2.rectangle(self.image,(100,150),(300,200),(200,200,200),-1)
-        cv2.putText(self.image,"New Game",(130,185),cv2.FONT_HERSHEY_SIMPLEX,0.8,(0,0,0),2)
+# ---------- Menu Screen ----------
+if st.session_state.menu == "main":
+    st.title("🎮 Tic Tac Toe")
+    st.write("Choose a game mode:")
 
-        cv2.rectangle(self.image,(100,220),(300,270),(200,200,200),-1)
-        cv2.putText(self.image,"Vs Computer",(125,255),cv2.FONT_HERSHEY_SIMPLEX,0.7,(0,0,0),2)
+    if st.button("👥 Play vs Friend"):
+        st.session_state.play_with_ai = False
+        st.session_state.menu = "name"
 
-        cv2.rectangle(self.image,(100,290),(300,340),(200,200,200),-1)
-        cv2.putText(self.image,"Vs Human",(140,325),cv2.FONT_HERSHEY_SIMPLEX,0.7,(0,0,0),2)
+    if st.button("🤖 Play vs Computer"):
+        st.session_state.play_with_ai = True
+        st.session_state.menu = "name"
 
-        cv2.rectangle(self.image,(100,360),(300,410),(200,200,200),-1)
-        cv2.putText(self.image,"Exit",(180,395),cv2.FONT_HERSHEY_SIMPLEX,0.8,(0,0,0),2)
+    if st.button("🚪 Exit Game"):
+        st.stop()
 
-        cv2.imshow(self.windowName,self.image)
 
-    def menuClick(self,x,y):
-        if 100 <= x <= 300 and 150 <= y <= 200:   # New Game
-            self.vsCom = 0
-            self.reset()
-            self.playGame()
-        elif 100 <= x <= 300 and 220 <= y <= 270: # Vs Computer
-            self.vsCom = 1
-            self.reset()
-            self.playGame()
-        elif 100 <= x <= 300 and 290 <= y <= 340: # Vs Human
-            self.vsCom = 0
-            self.reset()
-            self.playGame()
-        elif 100 <= x <= 300 and 360 <= y <= 410: # Exit
-            cv2.destroyAllWindows()
-            exit()
+# ---------- Name Input Screen ----------
+elif st.session_state.menu == "name":
+    st.title("📝 Enter Player Name(s)")
 
-    #-----------------------------------------------------------------------------------
-    #Game Play Functions
-    def playGame(self):
-        cv2.setMouseCallback(self.windowName,self.mouseCall)
-        while True and cv2.getWindowProperty(self.windowName,1) != -1:
-            if self.change:
-                self.change=False
-                self.draw()
-                if self.vsCom == self.turn and not(self.checkWin() or self.checkDraw()):
-                    block = self.nextMove()
-                    block.setValue("x" if self.turn==1 else "o")
-                    self.selected = True
-                    self.change = True
-                cv2.imshow(self.windowName,self.image)
+    st.session_state.player1 = st.text_input("Enter Player 1 Name:", "Player 1")
 
-            key = cv2.waitKey(1)
-            if key == 27: break  # Exit
-            elif key == ord("r"): self.reset()
-        cv2.destroyAllWindows()
+    if st.session_state.play_with_ai:
+        st.session_state.player2 = "Computer 🤖"
+    else:
+        st.session_state.player2 = st.text_input("Enter Player 2 Name:", "Player 2")
 
-    def mainLoop(self): # Main Loop with Menu
-        cv2.namedWindow(self.windowName)
-        while True:
-            self.drawMenu()
-            key = cv2.waitKey(1)
-            if key == 27:  # ESC to exit
-                break
-            def mouse(event,x,y,flags,param):
-                if event == cv2.EVENT_LBUTTONDOWN:
-                    self.menuClick(x,y)
-            cv2.setMouseCallback(self.windowName,mouse)
-        cv2.destroyAllWindows()
+    if st.button("✅ Start Game"):
+        reset()
+        st.session_state.menu = "game"
 
-    #-----------------------------------------------------------------------------------
-    def checkWin(self) :
-        self.win = False
-        if (self.blocks[0][0][0].value is not None and self.blocks[0][0][0].value==self.blocks[0][1][0].value==self.blocks[0][2][0].value)or(self.blocks[1][0][0].value is not None and self.blocks[1][0][0].value==self.blocks[1][1][0].value==self.blocks[1][2][0].value)or(self.blocks[2][0][0].value is not None and self.blocks[2][0][0].value==self.blocks[2][1][0].value==self.blocks[2][2][0].value)or(self.blocks[0][0][0].value is not None and self.blocks[0][0][0].value==self.blocks[1][0][0].value==self.blocks[2][0][0].value)or(self.blocks[0][1][0].value is not None and self.blocks[0][1][0].value==self.blocks[1][1][0].value==self.blocks[2][1][0].value)or(self.blocks[0][2][0].value is not None and self.blocks[0][2][0].value==self.blocks[1][2][0].value==self.blocks[2][2][0].value)or(self.blocks[0][0][0].value is not None and self.blocks[0][0][0].value==self.blocks[1][1][0].value==self.blocks[2][2][0].value)or(self.blocks[2][0][0].value is not None and self.blocks[2][0][0].value==self.blocks[0][2][0].value==self.blocks[1][1][0].value) :
-            self.win = True
-        return self.win
+    if st.button("⬅️ Back to Menu"):
+        st.session_state.menu = "main"
 
-    def checkDraw(self) :
-        flag = True
-        for i in range(3) :
-            for j in range(3) :
-                if self.blocks[i][j][0].value == None :
-                    flag=False
-        return flag
 
-    #-----------------------------------------------------------------------------------
-    #Computers Move Decided Using Minmax Algorithm
-    def nextMove(self) :
-        flag=0
-        blocks = []
-        for i in range(3) :
-            for j in range(3) :
-                if self.blocks[i][j][0].value == None :
-                    blocks.append(self.blocks[i][j][0])
-        if not (len(blocks)==sum([len(row) for row in self.blocks]) or len(blocks)==sum([len(row) for row in self.blocks])-1 or len(blocks)==1) :
-            scoresList={}
-            for block in blocks :
-                if block.value == None :
-                    if self.computerWins(block) :
-                        scoresList[block] = 50
-                    elif self.playerWins(block) :
-                        scoresList[block] = -50
-                    elif not self.checkDraw() :
-                        block.value   = ("x" if self.turn == 1 else "o")
-                        scoresList[block] = self.min_max(1,self.vsCom)
-                        block.value = None
-                    else :
-                        scoresList[block] = 0
-            bestScore = (min(scoresList.values()) if abs(min(scoresList.values()))>abs(max(scoresList.values())) else max(scoresList.values()))
-            blocks = []
-            for block in scoresList :
-                if scoresList[block] == bestScore :
-                    blocks.append(block)
-        choice = blocks[randint(0,len(blocks)-1)]
-        return choice
+# ---------- Game Screen ----------
+elif st.session_state.menu == "game":
+    st.title("🎮 Tic Tac Toe")
 
-    def min_max(self,depth,player) :
-        scoresList = []
-        for row in self.blocks :
-            for block in row :
-                if block[0].value == None :
-                    if self.computerWins(block[0]) :
-                        return (50-depth)
-                    elif self.playerWins(block[0]) :
-                        return (-50+depth)
-                    else :
-                        block[0].value = ("x" if self.turn == 1 else "o")
-                        scoresList.append(self.min_max(depth+1,player*-1))
-                        block[0].value = None
-        if scoresList:
-            return (min(scoresList) if abs(min(scoresList))>abs(max(scoresList)) else max(scoresList))
-        return 0
+    # Draw 3x3 board
+    cols = st.columns(3)
+    for i in range(9):
+        with cols[i % 3]:
+            if st.button(st.session_state.board[i] or " ", key=i, use_container_width=True):
+                if st.session_state.board[i] == "" and st.session_state.winner is None:
+                    # Player move
+                    st.session_state.board[i] = st.session_state.turn
+                    st.session_state.winner = check_winner(st.session_state.board)
 
-    def computerWins(self,block) :
-        flag = False
-        block.value = ("x" if self.vsCom == 1 else "o")
-        if self.checkWin() : flag = True
-        self.win = False
-        block.value = None
-        return flag
+                    # Switch turn
+                    if st.session_state.winner is None:
+                        st.session_state.turn = "O" if st.session_state.turn == "X" else "X"
 
-    def playerWins(self,block) :
-        flag = False
-        block.value = ("x" if self.vsCom != 1 else "o")
-        if self.checkWin() : flag = True
-        self.win = False
-        block.value = None
-        return flag
+                        # AI move if enabled
+                        if st.session_state.play_with_ai and st.session_state.turn == "O":
+                            ai_move()
+                            st.session_state.winner = check_winner(st.session_state.board)
+                            st.session_state.turn = "X"
 
-    #-----------------------------------------------------------------------------------
-    #Mouse Click Functions
-    def mouseCall(self,event,posx,posy,flag,param) :
-        if event == cv2.EVENT_LBUTTONDOWN and not self.win and self.turn!=self.vsCom:
-            self.setBlockInPos(posx,posy)
+    # Status message
+    if st.session_state.winner is None:
+        current = st.session_state.player1 if st.session_state.turn == "X" else st.session_state.player2
+        st.write(f"👉 {current}'s turn ({st.session_state.turn})")
+    elif st.session_state.winner == "Draw":
+        st.success("It's a Draw! 🤝")
+    else:
+        winner = st.session_state.player1 if st.session_state.winner == "X" else st.session_state.player2
+        st.success(f"🎉 {winner} wins!")
 
-    def setBlockInPos(self,x,y) :
-        for i in range(3) :
-            for j in range(3) :
-                if self.blocks[i][j][0].value is None and self.blocks[i][j][1][0]<=x<=self.blocks[i][j][2][0] and self.blocks[i][j][1][1]<= y<= self.blocks[i][j][2][1]:
-                    self.blocks[i][j][0].setValue("x" if self.turn == 1 else "o")
-                    self.change = True
-                    self.selected = True
-                    break
-
-#-----------------------------------------------------------------------------------
-#Main Program
-game = GUI("TicTacToe")
-game.mainLoop()
+    # Buttons
+    col1, col2 = st.columns(2)
+    with col1:
+        if st.button("🔄 Reset Game"):
+            reset()
+    with col2:
+        if st.button("⬅️ Back to Menu"):
+            reset()
+            st.session_state.menu = "main"
